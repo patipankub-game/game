@@ -59,6 +59,68 @@
     .live-label { font-size: 14px; color: #00ff88; letter-spacing: 1px; margin-bottom: 8px; }
     .countdown-num { font-size: 90px; font-weight: 800; color: #ff0055; text-shadow: 0 0 20px #ff0055; margin: 0; }
 
+    /* 👁️ ดวงตายมทูต: โหมดรอมองไปมา / โหมดโกรธไฟลุกก่อนออกคำสั่ง */
+    .grim-eye-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .grim-eye { width: 220px; max-width: 65vw; overflow: visible; filter: drop-shadow(0 0 12px rgba(0,242,254,0.35)); transition: filter 0.4s ease; }
+    .eye-hood { fill: #0d0d16; stroke: rgba(255,255,255,0.08); stroke-width: 2; transition: fill 0.4s ease, stroke 0.4s ease; }
+    .eye-sclera { fill: #e9ecf1; transition: fill 0.4s ease; }
+    .eye-iris-group { transform-box: fill-box; transform-origin: center; animation: eyeLook 7s ease-in-out infinite; }
+    .eye-iris { fill: #00c2fe; transition: fill 0.3s ease; }
+    .eye-pupil { fill: #050508; transition: r 0.3s ease; }
+    .eye-glint { fill: rgba(255,255,255,0.85); }
+    .eye-lid-top, .eye-lid-bottom { fill: #080811; transform-box: fill-box; transform-origin: center; }
+    .eye-lid-top { animation: blinkTop 6s ease-in-out infinite; }
+    .eye-lid-bottom { animation: blinkBottom 6s ease-in-out infinite; }
+    .eye-flames { opacity: 0; transition: opacity 0.3s ease; }
+    .flame { fill: #ff5500; transform-box: fill-box; transform-origin: bottom center; animation: flameFlicker 0.3s ease-in-out infinite alternate; }
+    .flame-right { animation-delay: 0.15s; }
+    .grim-caption { font-size: 24px; font-weight: 600; color: #00f2fe; }
+    .grim-caption-sub { font-size: 15px; color: #aab; opacity: 0.8; }
+
+    @keyframes eyeLook {
+      0%, 8%   { transform: translateX(0) translateY(0); }
+      15%, 25% { transform: translateX(-18px) translateY(-2px); }
+      35%, 45% { transform: translateX(16px) translateY(2px); }
+      55%, 65% { transform: translateX(0) translateY(0); }
+      75%, 85% { transform: translateX(-10px) translateY(4px); }
+      95%, 100%{ transform: translateX(0) translateY(0); }
+    }
+    @keyframes blinkTop {
+      0%, 46%, 52%, 100% { transform: scaleY(0); }
+      49% { transform: scaleY(1); }
+    }
+    @keyframes blinkBottom {
+      0%, 46%, 52%, 100% { transform: scaleY(0); }
+      49% { transform: scaleY(1); }
+    }
+    @keyframes flameFlicker {
+      from { transform: scaleY(1) scaleX(1); opacity: 0.85; }
+      to   { transform: scaleY(1.18) scaleX(0.88); opacity: 1; }
+    }
+
+    /* 🔥 โหมดโกรธ: ตอนนับถอยหลังก่อนออกคำสั่ง ดวงตาเปลี่ยนเป็นไฟลุกดุดัน */
+    .status-box.warning-mode .grim-eye {
+      filter: drop-shadow(0 0 24px rgba(255,60,0,0.9));
+      animation: eyeRage 0.35s ease-in-out infinite alternate;
+    }
+    .status-box.warning-mode .eye-iris-group { animation: none; transform: translateX(0) translateY(0); }
+    .status-box.warning-mode .eye-iris { fill: #ff3c00; animation: irisFire 0.4s ease-in-out infinite alternate; }
+    .status-box.warning-mode .eye-pupil { r: 5; }
+    .status-box.warning-mode .eye-sclera { fill: #2a0a08; }
+    .status-box.warning-mode .eye-hood { stroke: rgba(255,90,0,0.6); }
+    .status-box.warning-mode .eye-lid-top,
+    .status-box.warning-mode .eye-lid-bottom { animation: none; transform: scaleY(0); }
+    .status-box.warning-mode .eye-flames { opacity: 1; }
+
+    @keyframes eyeRage {
+      from { transform: scale(1); }
+      to   { transform: scale(1.05); }
+    }
+    @keyframes irisFire {
+      from { fill: #ff3c00; }
+      to   { fill: #ffb000; }
+    }
+
     .players-grid {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 15px; margin-top: 20px;
@@ -95,8 +157,29 @@
 
     <div id="statusBox" class="status-box">
       <div id="liveIndicator" class="live-label"><span class="heartbeat-dot"></span>LIVE - ระบบทำงานปกติ</div>
-      <div id="eventTitle" class="event-title">👀 กำลังส่องวงเหล้า...</div>
-      <div id="eventDesc" class="event-desc">ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)</div>
+
+      <div id="grimEyeWrap" class="grim-eye-wrap">
+        <svg viewBox="0 0 200 110" class="grim-eye" id="grimEye">
+          <g class="eye-flames">
+            <path class="flame flame-left"  d="M22,66 Q10,45 22,22 Q32,45 22,66 Z" />
+            <path class="flame flame-right" d="M178,66 Q190,45 178,22 Q168,45 178,66 Z" />
+          </g>
+          <ellipse class="eye-hood" cx="100" cy="60" rx="94" ry="50" />
+          <ellipse class="eye-sclera" cx="100" cy="58" rx="66" ry="24" />
+          <g class="eye-iris-group">
+            <circle class="eye-iris" cx="100" cy="58" r="19" />
+            <circle class="eye-pupil" cx="100" cy="58" r="9" />
+            <circle class="eye-glint" cx="94" cy="52" r="3" />
+          </g>
+          <path class="eye-lid-top" d="M34,58 Q100,18 166,58 Q100,58 34,58 Z" />
+          <path class="eye-lid-bottom" d="M34,58 Q100,98 166,58 Q100,58 34,58 Z" />
+        </svg>
+        <div id="grimCaption" class="grim-caption">👀 กำลังส่องวงเหล้า...</div>
+        <div id="grimCaptionSub" class="grim-caption-sub">ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)</div>
+      </div>
+
+      <div id="eventTitle" class="event-title" style="display:none;"></div>
+      <div id="eventDesc" class="event-desc" style="display:none;"></div>
     </div>
 
     <h3 style="margin-top: 30px;">👥 ผู้ร่วมชะตากรรม (<span id="playerCount" style="color: #ff007f;">0</span> คน)</h3>
@@ -129,18 +212,32 @@
     let audioAllowed = false;
     let idleResetTimer = null; // ตัวจับเวลาเด้งกลับหน้ารอ หลังโชว์คำสั่ง/ผลลัพธ์ครบเวลา
 
-    // 🔁 เด้งกลับไปหน้า "กำลังส่อง..." (โหมดรอ) และโชว์ heartbeat ให้เห็นว่าระบบยังทำงานอยู่
+    // 🔁 เด้งกลับไปโหมด "ตายมทูตมองไปมา" (โหมดรอ)
     function resetToIdle() {
       document.getElementById('statusBox').classList.remove('warning-mode');
-      document.getElementById('eventTitle').innerText = "👀 กำลังส่องวงเหล้า...";
-      document.getElementById('eventDesc').innerText = "ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)";
+      document.getElementById('grimEyeWrap').style.display = 'flex';
+      document.getElementById('grimCaption').innerText = "👀 กำลังส่องวงเหล้า...";
+      document.getElementById('grimCaptionSub').innerText = "ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)";
+      document.getElementById('eventTitle').style.display = 'none';
+      document.getElementById('eventDesc').style.display = 'none';
       document.getElementById('liveIndicator').style.display = 'block';
+    }
+
+    // 👉 สลับไปโชว์ข้อความคำสั่ง/ผลลัพธ์ (ซ่อนดวงตาไว้ชั่วคราว)
+    function showEventText() {
+      document.getElementById('grimEyeWrap').style.display = 'none';
+      document.getElementById('eventTitle').style.display = 'block';
+      document.getElementById('eventDesc').style.display = 'block';
+      document.getElementById('liveIndicator').style.display = 'none';
     }
 
     function scheduleIdleReset(ms = 10000) {
       if (idleResetTimer) clearTimeout(idleResetTimer);
       idleResetTimer = setTimeout(resetToIdle, ms);
     }
+
+    // เริ่มต้นที่โหมดรอ (ดวงตา) เสมอตอนโหลดหน้า
+    resetToIdle();
 
     function enableAudio() {
       let audio = document.getElementById('sirenSound');
@@ -247,7 +344,7 @@
         let randomMsg = safeMessages[Math.floor(Math.random() * safeMessages.length)];
 
         document.getElementById('statusBox').classList.remove('warning-mode');
-        document.getElementById('liveIndicator').style.display = 'none';
+        showEventText();
         document.getElementById('eventTitle').innerText = "🟢 SAFE ZONE!";
         document.getElementById('eventDesc').innerText = randomMsg;
 
@@ -258,23 +355,25 @@
         if (idleResetTimer) clearTimeout(idleResetTimer); // ระหว่างนับถอยหลัง/โชว์ผล ยังไม่ต้องเด้งกลับ
         playSiren();
         let statusBox = document.getElementById('statusBox');
-        statusBox.classList.add('warning-mode');
+        statusBox.classList.add('warning-mode'); // ← ตรงนี้เองที่ทำให้ดวงตากลายเป็นไฟลุกโกรธผ่าน CSS
         document.getElementById('liveIndicator').style.display = 'none';
 
-        document.getElementById('eventTitle').innerText = "🚨 WARNING! คำสั่งฉุกเฉิน! 🚨";
+        // 👁️🔥 ดวงตายังโชว์อยู่ แต่กลายเป็นไฟลุกโกรธ พร้อมนับถอยหลังทับบนคำบรรยาย
+        document.getElementById('grimCaption').innerText = "🚨 เตรียมตัว!! คำสั่งกำลังจะมา";
         
         let count = 3;
-        document.getElementById('eventDesc').innerHTML = `<div class="countdown-num">${count}</div>`;
+        document.getElementById('grimCaptionSub').innerHTML = `<div class="countdown-num">${count}</div>`;
         
         roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'COUNTDOWN_START', seconds: count } });
 
         let countdownTimer = setInterval(async () => {
           count--;
           if (count > 0) {
-            document.getElementById('eventDesc').innerHTML = `<div class="countdown-num">${count}</div>`;
+            document.getElementById('grimCaptionSub').innerHTML = `<div class="countdown-num">${count}</div>`;
           } else {
             clearInterval(countdownTimer);
             statusBox.classList.remove('warning-mode');
+            showEventText(); // สลับจากดวงตา ไปโชว์คำสั่งจริงพอดีตอนนับครบ 0
             executeEvent();
           }
         }, 1000);

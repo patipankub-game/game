@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Party Chaos Engine (With Countdown & Sound)</title>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; font-family: 'Kanit', sans-serif; }
     body {
@@ -77,7 +77,7 @@
   <div class="container">
     <button id="enableAudioBtn" class="btn-audio" onclick="enableAudio()">🔊 คลิก 1 ครั้งเพื่อเปิดเสียงเตือนปาร์ตี้</button>
     
-    <h1 class="logo">เสี่ยงดวงนะจ๊ะ <span class="ai-badge">ขอให้โดนๆ</span></h1>
+    <h1 class="logo">PARTY CHAOS ENGINE <span class="ai-badge">AI ACTIVE 🤖</span></h1>
     <div class="room-card">ROOM CODE: <span id="displayRoomCode" class="room-code">----</span></div>
 
     <div id="statusBox" class="status-box">
@@ -95,12 +95,14 @@
 
   <script>
     const SUPABASE_URL = 'https://afhsvrsgfuxaeqvjedxf.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjE0MDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjEwMDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
+    
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false }
+    });
 
-    const GEMINI_API_KEY = "AQ.Ab8RN6JeuSJFFHZyGxDRRoRNBGh8dXwbBkpMJkkWrdCg3c-7ZQ";
+    const GEMINI_API_KEY = "วาง_GEMINI_API_KEY_ของคุณตรงนี้";
 
-    // 🔒 1. เช็ก localStorage ถ้ามีเลขห้องเดิมให้ใช้เลขเดิม พอกด Refresh เลขห้องจะไม่เปลี่ยน
     let targetRoom = localStorage.getItem('party_display_room');
     if (!targetRoom) {
       targetRoom = Math.floor(1000 + Math.random() * 9000).toString();
@@ -130,7 +132,6 @@
       }
     }
 
-    // 🔄 2. ดึงรายชื่อผู้เล่นและจัดเรียงหน้าจอ
     async function fetchPlayers() {
       const { data, error } = await _supabase
         .from('players')
@@ -152,7 +153,6 @@
       });
     }
 
-    // 📡 3. ระบบ Realtime ดักฟังเมื่อมีผู้เล่นใหม่เข้ามา ให้ดึงข้อมูลทันที
     function initRealtime() {
       _supabase
         .channel('realtime_players_' + targetRoom)
@@ -160,7 +160,7 @@
           'postgres_changes',
           { event: '*', schema: 'public', table: 'players', filter: `room_code=eq.${targetRoom}` },
           (payload) => {
-            fetchPlayers(); // เมื่อมีการเพิ่ม/ลบ ผู้เล่น ให้ดึงข้อมูลงวดใหม่ทันที
+            fetchPlayers();
           }
         )
         .subscribe();
@@ -169,12 +169,11 @@
     async function finishAndNewRoom() {
       if (confirm("ต้องการปิดวงนี้ และสุ่มสร้างห้องใหม่ใช่ไหม? (ผู้เล่นเก่าจะต้องเข้าห้องใหม่)")) {
         await _supabase.from('players').delete().eq('room_code', targetRoom);
-        localStorage.removeItem('party_display_room'); // ลบเลขห้องเดิมออก
+        localStorage.removeItem('party_display_room');
         window.location.reload(); 
       }
     }
 
-    // เริ่มต้นทำงาน
     fetchPlayers();
     initRealtime();
 

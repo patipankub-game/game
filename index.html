@@ -11,7 +11,16 @@
     body {
       margin: 0; padding: 20px; min-height: 100vh; background: #080811;
       color: white; text-align: center; display: flex; flex-direction: column; justify-content: center;
+      transition: background 0.2s;
     }
+    body.warning-flash {
+      animation: flashBg 0.4s infinite alternate;
+    }
+    @keyframes flashBg {
+      from { background: #080811; }
+      to { background: #880000; }
+    }
+
     .card {
       background: rgba(22, 22, 35, 0.9); border: 1px solid rgba(255, 0, 128, 0.3);
       border-radius: 20px; padding: 25px; box-shadow: 0 0 20px rgba(0,0,0,0.5);
@@ -28,6 +37,7 @@
     }
     .game-screen { display: none; }
     .status-text { font-size: 24px; font-weight: bold; color: #00f2fe; margin-bottom: 15px; }
+    .countdown-num { font-size: 80px; font-weight: 800; color: #ff0055; text-shadow: 0 0 20px #ff0055; margin: 10px 0; }
     .btn-leave { background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff4d4d; font-size: 14px; padding: 8px; margin-top: 20px; }
   </style>
 </head>
@@ -46,7 +56,7 @@
     <div id="gameScreen" class="game-screen">
       <div id="playerNameDisplay" style="color: #aaa; font-size: 14px;">ผู้เล่น: -</div>
       <div id="roomDisplay" style="color: #00f2fe; font-size: 16px; margin-bottom: 20px;">ห้อง: -</div>
-      <div id="statusText" class="status-text">👀 รอคำสั่งจากจอกลาง...</div>
+      <div id="statusText" class="status-text">👀 รอคำสั่งจากนางฟ้าผู้โชคดีนะจ๊ะ</div>
       <div id="actionArea"></div>
       
       <button class="btn-leave" onclick="leaveGame()">🚪 ออกจากห้องนี้</button>
@@ -62,7 +72,6 @@
     let currentPlayer = "";
     let roomChannel = null;
 
-    // 🔄 เช็กตอนเปิดหน้าเว็บว่าเคยเซฟชื่อไว้ไหม (ถ้ามี ให้เข้าเกมอัตโนมัติ)
     window.onload = () => {
       const savedRoom = localStorage.getItem('party_room');
       const savedName = localStorage.getItem('party_name');
@@ -70,7 +79,7 @@
       if (savedRoom && savedName) {
         document.getElementById('roomInput').value = savedRoom;
         document.getElementById('nameInput').value = savedName;
-        joinGame(true); // สั่งเข้าเกมอัตโนมัติ
+        joinGame(true);
       }
     };
 
@@ -86,16 +95,13 @@
       currentRoom = room;
       currentPlayer = name;
 
-      // เซฟข้อมูลลงเครื่องโทรศัพท์
       localStorage.setItem('party_room', room);
       localStorage.setItem('party_name', name);
 
       if (!isAuto) {
-        // ส่งชื่อเข้า Supabase เฉพาะตอนที่ไม่ได้กด Refresh อัตโนมัติ
         await _supabase.from('players').insert([{ room_code: room, player_name: name }]);
       }
 
-      // สลับหน้าจอ
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('playerNameDisplay').innerText = `ผู้เล่น: ${name}`;
@@ -115,19 +121,42 @@
           let status = document.getElementById('statusText');
           let area = document.getElementById('actionArea');
 
-          if (data.type === 'SAFE_ZONE') {
+          // 🚨 จอมือถือเริ่มนับถอยหลังพร้อมสั่นเตือน!
+          if (data.type === 'COUNTDOWN_START') {
+            document.body.classList.add('warning-flash');
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]); // สั่นมือถือ
+            
+            status.innerText = "🚨 WARNING! เตรียมตัว!";
+            let count = data.seconds;
+            area.innerHTML = `<div class="countdown-num">${count}</div>`;
+
+            let cd = setInterval(() => {
+              count--;
+              if (count > 0) {
+                area.innerHTML = `<div class="countdown-num">${count}</div>`;
+              } else {
+                clearInterval(cd);
+                document.body.classList.remove('warning-flash');
+              }
+            }, 1000);
+          }
+          else if (data.type === 'SAFE_ZONE') {
+            document.body.classList.remove('warning-flash');
             status.innerText = "🟢 SAFE ZONE!";
             area.innerHTML = `<p style="color:#fff">${data.msg}</p>`;
           } 
           else if (data.type === 'RED_FLASH') {
+            document.body.classList.remove('warning-flash');
             status.innerText = "🚨 RED FLASH! 🚨";
             if (data.victimName === currentPlayer) {
-              area.innerHTML = `<h1 style="color:#ff0055; font-size:40px;">โดนเต็มๆ!<br>จัดไป 1 ช็อต! 🍺</h1>`;
+              if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+              area.innerHTML = `<h1 style="color:#ff0055; font-size:36px;">โดนเต็มๆ!<br>จัดไป 1 ช็อต! 🍺</h1>`;
             } else {
               area.innerHTML = `<p>รอดตัวไป! คนโดนคือ: <b style="color:#00f2fe">${data.victimName}</b></p>`;
             }
           }
           else if (data.type === 'SILENT_RULE') {
+            document.body.classList.remove('warning-flash');
             status.innerText = "🤐 SILENT MODE";
             area.innerHTML = `<p>ห้ามพูดคำว่า: <b style="color:#ff007f; font-size:24px;">"${data.word}"</b></p>`;
           }
@@ -135,7 +164,6 @@
         .subscribe();
     }
 
-    // 🚪 ปุ่มกดออกจากห้อง (สำหรับล้างความจำเครื่องโทรศัพท์)
     function leaveGame() {
       localStorage.removeItem('party_room');
       localStorage.removeItem('party_name');

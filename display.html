@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Party Chaos Engine 70/30 Mode</title>
+  <title>Party Chaos Engine (AI Powered)</title>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -43,21 +43,34 @@
       background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 0, 128, 0.3);
       border-radius: 16px; padding: 15px;
     }
+    .ai-badge {
+      background: linear-gradient(45deg, #7928ca, #ff007f);
+      font-size: 14px; padding: 4px 12px; border-radius: 10px; margin-left: 8px; vertical-align: middle;
+    }
+    .btn-reset {
+      background: rgba(255, 0, 85, 0.2); border: 1px solid #ff0055;
+      color: #ff4d4d; padding: 8px 16px; border-radius: 12px;
+      font-size: 14px; cursor: pointer; margin-top: 15px; transition: 0.2s;
+    }
+    .btn-reset:hover { background: #ff0055; color: white; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <h1 class="logo">PARTY CHAOS ENGINE (BALANCED) 🥂</h1>
+    <h1 class="logo">PARTY CHAOS ENGINE <span class="ai-badge">AI ACTIVE 🤖</span></h1>
     <div class="room-card">ROOM CODE: <span class="room-code">8888</span></div>
 
     <div class="status-box">
       <div id="eventTitle" class="event-title">👀 กำลังส่องวงเหล้า...</div>
-      <div id="eventDesc" class="event-desc">ระบบสุ่มทุก 1.5 - 3 นาที (โอกาสรอด 70% / โดนเกม 30%)</div>
+      <div id="eventDesc" class="event-desc">ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)</div>
     </div>
 
     <h3 style="margin-top: 30px;">👥 ผู้ร่วมชะตากรรม (<span id="playerCount" style="color: #ff007f;">0</span> คน)</h3>
     <div id="playersGrid" class="players-grid"></div>
+
+    <!-- ปุ่มกดล้างห้อง/เริ่มวงใหม่ -->
+    <button class="btn-reset" onclick="resetRoom()">🗑️ ล้างรายชื่อผู้เล่น (เริ่มวงใหม่)</button>
   </div>
 
   <script>
@@ -65,6 +78,9 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjEwMDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const targetRoom = "8888";
+
+    // 🔑 เอา API Key ของ Gemini มาวางตรงนี้ครับ
+    const GEMINI_API_KEY = "วาง_GEMINI_API_KEY_ของคุณตรงนี้";
 
     let playerList = [];
     let roomChannel = _supabase.channel('room_' + targetRoom);
@@ -96,6 +112,16 @@
       });
     }
 
+    // 🧹 ฟังก์ชั่นสำหรับล้างผู้เล่นทั้งหมดในห้องนี้ออก
+    async function resetRoom() {
+      if (confirm("คุณต้องการล้างรายชื่อผู้เล่นเก่าทั้งหมดเพื่อเริ่มวงใหม่ใช่ไหม?")) {
+        await _supabase.from('players').delete().eq('room_code', targetRoom);
+        playerList = [];
+        renderPlayers();
+        alert("ล้างรายชื่อเรียบร้อย! เพื่อนๆ สามารถสแกนกดเข้าห้องใหม่ได้เลย");
+      }
+    }
+
     fetchPlayers();
     _supabase.channel('public:players')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players' }, payload => {
@@ -103,7 +129,28 @@
       }).subscribe();
 
     // ----------------------------------------------------
-    // ⚙️ CHAOS ENGINE LOOP (สุ่มช่วงเวลา 1.5 - 3 นาที)
+    // 🤖 GEMINI AI INTEGRATION
+    // ----------------------------------------------------
+    async function askGemini(promptText, fallbackAnswer) {
+      if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("วาง_GEMINI")) {
+        return fallbackAnswer;
+      }
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+        });
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text.trim();
+      } catch (err) {
+        return fallbackAnswer;
+      }
+    }
+
+    // ----------------------------------------------------
+    // ⚙️ CHAOS ENGINE LOOP
     // ----------------------------------------------------
     function startChaosLoop() {
       let nextInterval = Math.floor(Math.random() * (180000 - 90000 + 1)) + 90000; 
@@ -114,10 +161,9 @@
       }, nextInterval);
     }
 
-    function triggerRandomEvent() {
+    async function triggerRandomEvent() {
       if (playerList.length === 0) return;
 
-      // 🎯 สุ่มดวงก่อน: 1-10 (1-7 คือรอด 70% / 8-10 คือโดนเกม 30%)
       let luckRoll = Math.floor(Math.random() * 10) + 1;
 
       if (luckRoll <= 7) {
@@ -155,17 +201,19 @@
           roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'BOMB_START', holderName: holder.player_name, playerList: playerList.map(p => p.player_name) } });
         } 
         else if (eventType === 4) {
-          let words = ["กิน", "แก้ว", "ชน", "มึง", "ช็อต"];
-          let randomWord = words[Math.floor(Math.random() * words.length)];
+          let aiPrompt = "ขอคำห้ามพูด 1 คำที่คนในวงเหล้าชอบพูดบ่อยๆ ขอแบบคำเดียวสั้นๆ ภาษาไทย เช่น 'กิน', 'แก้ว', 'มึง', 'ชน' ตอบเฉพาะตัวคำนั้นเท่านั้น";
+          let randomWord = await askGemini(aiPrompt, "ชน");
+
           document.getElementById('eventTitle').innerText = "🤐 SILENT MODE (1 นาที)";
-          document.getElementById('eventDesc').innerText = `กฎเหล็ก: ห้ามใครพูดคำว่า "${randomWord}" เด็ดขาด!`;
+          document.getElementById('eventDesc').innerText = `กฎเหล็กจาก AI: ห้ามใครพูดคำว่า "${randomWord}" เด็ดขาด!`;
           roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SILENT_RULE', word: randomWord } });
         } 
         else if (eventType === 5) {
-          let questions = ["ใครทรงน่าจะกลับบ้านคนแรก?", "ใครคออ่อนที่สุดในโต๊ะ?", "ใครเจ้าชู้ที่สุดในวง?"];
-          let q = questions[Math.floor(Math.random() * questions.length)];
+          let aiPrompt = "ขอคำถามโหวตปั่นๆ กวนๆ ฮาๆ ในวงเหล้าเพื่อนสนิท 1 ข้อ เช่น 'ใครทรงน่าจะกลับบ้านคนแรก', 'ใครชอบทักหาแฟนเก่าตอนเมา' ตอบเฉพาะคำถามภาษาไทยสั้นๆ ไม่ต้องมีอารัมภบท";
+          let q = await askGemini(aiPrompt, "ใครทรงน่าจะกลับบ้านคนแรก?");
+
           document.getElementById('eventTitle').innerText = "👉 VOTE TIME!";
-          document.getElementById('eventDesc').innerText = q;
+          document.getElementById('eventDesc').innerText = "🤖 คำถามจาก AI: " + q;
           roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'VOTE_GAME', question: q, playerList: playerList.map(p => p.player_name) } });
         }
       }

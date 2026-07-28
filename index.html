@@ -56,7 +56,7 @@
     <div id="gameScreen" class="game-screen">
       <div id="playerNameDisplay" style="color: #aaa; font-size: 14px;">ผู้เล่น: -</div>
       <div id="roomDisplay" style="color: #00f2fe; font-size: 16px; margin-bottom: 20px;">ห้อง: -</div>
-      <div id="statusText" class="status-text">👀 รอคำสั่งจากนางฟ้าผู้โชคดีนะจ๊ะ</div>
+      <div id="statusText" class="status-text">👀 รอคำสั่งจากจอกลาง...</div>
       <div id="actionArea"></div>
       
       <button class="btn-leave" onclick="leaveGame()">🚪 ออกจากห้องนี้</button>
@@ -72,18 +72,7 @@
     let currentPlayer = "";
     let roomChannel = null;
 
-    window.onload = () => {
-      const savedRoom = localStorage.getItem('party_room');
-      const savedName = localStorage.getItem('party_name');
-      
-      if (savedRoom && savedName) {
-        document.getElementById('roomInput').value = savedRoom;
-        document.getElementById('nameInput').value = savedName;
-        joinGame(true);
-      }
-    };
-
-    async function joinGame(isAuto = false) {
+    async function joinGame() {
       const room = document.getElementById('roomInput').value.trim();
       const name = document.getElementById('nameInput').value.trim();
 
@@ -95,11 +84,15 @@
       currentRoom = room;
       currentPlayer = name;
 
-      localStorage.setItem('party_room', room);
-      localStorage.setItem('party_name', name);
+      // บันทึกลง Supabase ทันที
+      const { data, error } = await _supabase
+        .from('players')
+        .insert([{ room_code: room, player_name: name }]);
 
-      if (!isAuto) {
-        await _supabase.from('players').insert([{ room_code: room, player_name: name }]);
+      if (error) {
+        console.error("Supabase Error:", error);
+        alert("เกิดข้อผิดพลาดในการเข้าห้อง: " + error.message);
+        return;
       }
 
       document.getElementById('loginScreen').style.display = 'none';
@@ -121,10 +114,9 @@
           let status = document.getElementById('statusText');
           let area = document.getElementById('actionArea');
 
-          // 🚨 จอมือถือเริ่มนับถอยหลังพร้อมสั่นเตือน!
           if (data.type === 'COUNTDOWN_START') {
             document.body.classList.add('warning-flash');
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]); // สั่นมือถือ
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
             
             status.innerText = "🚨 WARNING! เตรียมตัว!";
             let count = data.seconds;
@@ -165,8 +157,6 @@
     }
 
     function leaveGame() {
-      localStorage.removeItem('party_room');
-      localStorage.removeItem('party_name');
       window.location.reload();
     }
   </script>

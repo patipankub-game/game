@@ -52,7 +52,11 @@
     }
     .player-card {
       background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 0, 128, 0.3);
-      border-radius: 16px; padding: 15px;
+      border-radius: 16px; padding: 15px; animation: popIn 0.3s ease-out;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.8); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
     }
     .ai-badge {
       background: linear-gradient(45deg, #7928ca, #ff007f);
@@ -77,17 +81,16 @@
     <div class="room-card">ROOM CODE: <span id="displayRoomCode" class="room-code">----</span></div>
 
     <div id="statusBox" class="status-box">
-      <div id="eventTitle" class="event-title">👀</div>
-      <div id="eventDesc" class="event-desc">โดนแน่นังทัวร์ดี</div>
+      <div id="eventTitle" class="event-title">👀 กำลังส่องวงเหล้า...</div>
+      <div id="eventDesc" class="event-desc">ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)</div>
     </div>
 
     <h3 style="margin-top: 30px;">👥 ผู้ร่วมชะตากรรม (<span id="playerCount" style="color: #ff007f;">0</span> คน)</h3>
     <div id="playersGrid" class="players-grid"></div>
 
-    <button class="btn-action" onclick="finishAndNewRoom()">🚪 จบวงนี้ & สุ่มสร้างห้องใหม่ </button>
+    <button class="btn-action" onclick="finishAndNewRoom()">🚪 จบวงนี้ & สุ่มสร้างห้องใหม่ (ลบผู้เล่นเก่า)</button>
   </div>
 
-  <!-- เสียงไซเรนจอกลาง -->
   <audio id="sirenSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
   <script>
@@ -97,7 +100,12 @@
 
     const GEMINI_API_KEY = "วาง_GEMINI_API_KEY_ของคุณตรงนี้";
 
-    let targetRoom = Math.floor(1000 + Math.random() * 9000).toString();
+    // 🔒 1. เช็ก localStorage ถ้ามีเลขห้องเดิมให้ใช้เลขเดิม พอกด Refresh เลขห้องจะไม่เปลี่ยน
+    let targetRoom = localStorage.getItem('party_display_room');
+    if (!targetRoom) {
+      targetRoom = Math.floor(1000 + Math.random() * 9000).toString();
+      localStorage.setItem('party_display_room', targetRoom);
+    }
     document.getElementById('displayRoomCode').innerText = targetRoom;
 
     let playerList = [];
@@ -121,19 +129,14 @@
         audio.play();
       }
     }
-    
-    roomChannel
-      .on('broadcast', { event: 'game_response' }, payload => {
-        let d = payload.payload;
-        if(d.action === 'BOMB_EXPLODED') {
-          document.getElementById('eventTitle').innerText = "💣 ตู้มมมมม!";
-          document.getElementById('eventDesc').innerText = `ระเบิดตู้มใส่ ${d.victim}! จัดไป 1 ช็อต!`;
-        }
-      })
-      .subscribe();
 
+    // 🔄 2. ดึงรายชื่อผู้เล่นและจัดเรียงหน้าจอ
     async function fetchPlayers() {
-      const { data } = await _supabase.from('players').select('*').eq('room_code', targetRoom);
+      const { data, error } = await _supabase
+        .from('players')
+        .select('*')
+        .eq('room_code', targetRoom);
+      
       if (data) {
         playerList = data;
         renderPlayers();
@@ -149,18 +152,31 @@
       });
     }
 
+    // 📡 3. ระบบ Realtime ดักฟังเมื่อมีผู้เล่นใหม่เข้ามา ให้ดึงข้อมูลทันที
+    function initRealtime() {
+      _supabase
+        .channel('realtime_players_' + targetRoom)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'players', filter: `room_code=eq.${targetRoom}` },
+          (payload) => {
+            fetchPlayers(); // เมื่อมีการเพิ่ม/ลบ ผู้เล่น ให้ดึงข้อมูลงวดใหม่ทันที
+          }
+        )
+        .subscribe();
+    }
+
     async function finishAndNewRoom() {
-      if (confirm("ต้องการปิดวงนี้ และลบรายชื่อผู้เล่นเพื่อสุ่มสร้างห้องใหม่ใช่ไหม?")) {
+      if (confirm("ต้องการปิดวงนี้ และสุ่มสร้างห้องใหม่ใช่ไหม? (ผู้เล่นเก่าจะต้องเข้าห้องใหม่)")) {
         await _supabase.from('players').delete().eq('room_code', targetRoom);
+        localStorage.removeItem('party_display_room'); // ลบเลขห้องเดิมออก
         window.location.reload(); 
       }
     }
 
+    // เริ่มต้นทำงาน
     fetchPlayers();
-    _supabase.channel('public:players')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players' }, payload => {
-        if (payload.new.room_code === targetRoom) fetchPlayers();
-      }).subscribe();
+    initRealtime();
 
     async function askGemini(promptText, fallbackAnswer) {
       if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("วาง_GEMINI")) {
@@ -196,8 +212,8 @@
 
       if (luckRoll <= 7) {
         let safeMessages = [
-          "🎉 สวรรค์ทรงโปรด! รอบนี้รอดทุกคน พักตับ !",
-          "💧 ดื่มยกวง",
+          "🎉 สวรรค์ทรงโปรด! รอบนี้รอดทุกคน พักตับ 3 นาที!",
+          "💧 แจ้งเตือนสุขภาพ: จิบน้ำเปล่ากันคนละกึ๊บด่วน!",
           "🍻 ชนแก้วเบาๆ แบบสันติภาพ ไม่มีใครโดนทำโทษ!",
           "✨ ปลอดภัยไร้ระเบิด! สังสรรค์กันต่อตามอัธยาศัย"
         ];
@@ -210,7 +226,6 @@
         roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SAFE_ZONE', msg: randomMsg } });
       } 
       else {
-        // 🚨 แจ้งเตือนเริ่มนับถอยหลังยิงไปที่จอมือถือทุกคนพร้อมกัน!
         playSiren();
         let statusBox = document.getElementById('statusBox');
         statusBox.classList.add('warning-mode');
@@ -220,7 +235,6 @@
         let count = 3;
         document.getElementById('eventDesc').innerHTML = `<div class="countdown-num">${count}</div>`;
         
-        // ส่งสัญญาณบอกจอมือถือให้นับถอยหลัง 3 วินาที
         roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'COUNTDOWN_START', seconds: count } });
 
         let countdownTimer = setInterval(async () => {
@@ -230,7 +244,7 @@
           } else {
             clearInterval(countdownTimer);
             statusBox.classList.remove('warning-mode');
-            executeEvent(); // หมดเวลา 3 วิ -> เริ่มเฉลยมินิเกม
+            executeEvent();
           }
         }, 1000);
       }

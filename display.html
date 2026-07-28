@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Party Chaos Engine (Auto Room System)</title>
+  <title>Party Chaos Engine (With Countdown & Sound)</title>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -29,11 +29,22 @@
     .status-box {
       background: rgba(20, 20, 35, 0.9); border: 2px solid #ff007f;
       border-radius: 24px; padding: 30px; margin: 20px 0;
-      box-shadow: 0 0 30px rgba(255, 0, 127, 0.3); min-height: 200px;
+      box-shadow: 0 0 30px rgba(255, 0, 127, 0.3); min-height: 220px;
       display: flex; flex-direction: column; justify-content: center; align-items: center;
+      transition: all 0.3s ease;
     }
+    .status-box.warning-mode {
+      border-color: #ff0000;
+      animation: blinkBg 0.5s infinite alternate;
+    }
+    @keyframes blinkBg {
+      from { box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); }
+      to { box-shadow: 0 0 60px rgba(255, 0, 0, 0.9); background: rgba(50, 10, 20, 0.95); }
+    }
+
     .event-title { font-size: 38px; font-weight: 800; color: #00f2fe; }
     .event-desc { font-size: 22px; color: #fff; margin-top: 10px; }
+    .countdown-num { font-size: 90px; font-weight: 800; color: #ff0055; text-shadow: 0 0 20px #ff0055; margin: 0; }
 
     .players-grid {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -52,25 +63,32 @@
       color: #ff4d4d; padding: 10px 20px; border-radius: 14px;
       font-size: 16px; cursor: pointer; margin-top: 25px; transition: 0.2s; font-weight: 600;
     }
-    .btn-action:hover { background: #ff0055; color: white; box-shadow: 0 0 15px rgba(255,0,85,0.5); }
+    .btn-audio {
+      background: #00f2fe; color: #000; font-weight: bold; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
 
   <div class="container">
+    <button id="enableAudioBtn" class="btn-audio" onclick="enableAudio()">🔊 คลิก 1 ครั้งเพื่อเปิดเสียงเตือนปาร์ตี้</button>
+    
     <h1 class="logo">PARTY CHAOS ENGINE <span class="ai-badge">AI ACTIVE 🤖</span></h1>
     <div class="room-card">ROOM CODE: <span id="displayRoomCode" class="room-code">----</span></div>
 
-    <div class="status-box">
-      <div id="eventTitle" class="event-title">👀 กำลังส่องวงเหล้า...</div>
-      <div id="eventDesc" class="event-desc">ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)</div>
+    <div id="statusBox" class="status-box">
+      <div id="eventTitle" class="event-title">👀</div>
+      <div id="eventDesc" class="event-desc">โดนแน่นังทัวร์ดี</div>
     </div>
 
     <h3 style="margin-top: 30px;">👥 ผู้ร่วมชะตากรรม (<span id="playerCount" style="color: #ff007f;">0</span> คน)</h3>
     <div id="playersGrid" class="players-grid"></div>
 
-    <button class="btn-action" onclick="finishAndNewRoom()">🚪 จบวงนี้ & สุ่มสร้างห้องใหม่ (ลบผู้เล่นเก่า)</button>
+    <button class="btn-action" onclick="finishAndNewRoom()">🚪 จบวงนี้ & สุ่มสร้างห้องใหม่ </button>
   </div>
+
+  <!-- เสียงไซเรนจอกลาง -->
+  <audio id="sirenSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
   <script>
     const SUPABASE_URL = 'https://afhsvrsgfuxaeqvjedxf.supabase.co';
@@ -79,12 +97,30 @@
 
     const GEMINI_API_KEY = "วาง_GEMINI_API_KEY_ของคุณตรงนี้";
 
-    // 🎲 ฟังก์ชั่นสุ่ม Room Code 4 หลัก
     let targetRoom = Math.floor(1000 + Math.random() * 9000).toString();
     document.getElementById('displayRoomCode').innerText = targetRoom;
 
     let playerList = [];
     let roomChannel = _supabase.channel('room_' + targetRoom);
+    let audioAllowed = false;
+
+    function enableAudio() {
+      let audio = document.getElementById('sirenSound');
+      audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audioAllowed = true;
+        document.getElementById('enableAudioBtn').style.display = 'none';
+      }).catch(e => console.log("Audio play error", e));
+    }
+
+    function playSiren() {
+      if (audioAllowed) {
+        let audio = document.getElementById('sirenSound');
+        audio.currentTime = 0;
+        audio.play();
+      }
+    }
     
     roomChannel
       .on('broadcast', { event: 'game_response' }, payload => {
@@ -113,7 +149,6 @@
       });
     }
 
-    // 🧹 ฟังก์ชั่นจบวง ลบข้อมูลในห้องนี้ แล้วรีโหลดสร้างห้องใหม่
     async function finishAndNewRoom() {
       if (confirm("ต้องการปิดวงนี้ และลบรายชื่อผู้เล่นเพื่อสุ่มสร้างห้องใหม่ใช่ไหม?")) {
         await _supabase.from('players').delete().eq('room_code', targetRoom);
@@ -127,9 +162,6 @@
         if (payload.new.room_code === targetRoom) fetchPlayers();
       }).subscribe();
 
-    // ----------------------------------------------------
-    // 🤖 GEMINI AI INTEGRATION
-    // ----------------------------------------------------
     async function askGemini(promptText, fallbackAnswer) {
       if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("วาง_GEMINI")) {
         return fallbackAnswer;
@@ -148,9 +180,6 @@
       }
     }
 
-    // ----------------------------------------------------
-    // ⚙️ CHAOS ENGINE LOOP
-    // ----------------------------------------------------
     function startChaosLoop() {
       let nextInterval = Math.floor(Math.random() * (180000 - 90000 + 1)) + 90000; 
 
@@ -167,54 +196,81 @@
 
       if (luckRoll <= 7) {
         let safeMessages = [
-          "🎉 สวรรค์ทรงโปรด! รอบนี้รอดทุกคน พักตับ 3 นาที!",
-          "💧 แจ้งเตือนสุขภาพ: จิบน้ำเปล่ากันคนละกึ๊บด่วน!",
+          "🎉 สวรรค์ทรงโปรด! รอบนี้รอดทุกคน พักตับ !",
+          "💧 ดื่มยกวง",
           "🍻 ชนแก้วเบาๆ แบบสันติภาพ ไม่มีใครโดนทำโทษ!",
           "✨ ปลอดภัยไร้ระเบิด! สังสรรค์กันต่อตามอัธยาศัย"
         ];
         let randomMsg = safeMessages[Math.floor(Math.random() * safeMessages.length)];
 
+        document.getElementById('statusBox').classList.remove('warning-mode');
         document.getElementById('eventTitle').innerText = "🟢 SAFE ZONE!";
         document.getElementById('eventDesc').innerText = randomMsg;
 
         roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SAFE_ZONE', msg: randomMsg } });
       } 
       else {
-        let eventType = Math.floor(Math.random() * 5) + 1; 
+        // 🚨 แจ้งเตือนเริ่มนับถอยหลังยิงไปที่จอมือถือทุกคนพร้อมกัน!
+        playSiren();
+        let statusBox = document.getElementById('statusBox');
+        statusBox.classList.add('warning-mode');
 
-        if (eventType === 1) {
-          let victim = playerList[Math.floor(Math.random() * playerList.length)];
-          document.getElementById('eventTitle').innerText = "🚨 RED FLASH! 🚨";
-          document.getElementById('eventDesc').innerText = `สเปกตรัมตกที่: ${victim.player_name} (ยก 1 ช็อต!)`;
-          roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'RED_FLASH', victimName: victim.player_name } });
-        } 
-        else if (eventType === 2) {
-          document.getElementById('eventTitle').innerText = "⚡ SPEED TAP! ⚡";
-          document.getElementById('eventDesc').innerText = "กดปุ่มบนมือถือด่วน! ใครกดช้าสุดเตรียมตัว!";
-          roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SPEED_TAP' } });
-        } 
-        else if (eventType === 3) {
-          let holder = playerList[Math.floor(Math.random() * playerList.length)];
-          document.getElementById('eventTitle').innerText = "💣 BOMB PASS! 💣";
-          document.getElementById('eventDesc').innerText = `ระเบิดเริ่มที่: ${holder.player_name}! รีบส่งต่อด่วน!`;
-          roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'BOMB_START', holderName: holder.player_name, playerList: playerList.map(p => p.player_name) } });
-        } 
-        else if (eventType === 4) {
-          let aiPrompt = "ขอคำห้ามพูด 1 คำที่คนในวงเหล้าชอบพูดบ่อยๆ ขอแบบคำเดียวสั้นๆ ภาษาไทย เช่น 'กิน', 'แก้ว', 'มึง', 'ชน' ตอบเฉพาะตัวคำนั้นเท่านั้น";
-          let randomWord = await askGemini(aiPrompt, "ชน");
+        document.getElementById('eventTitle').innerText = "🚨 WARNING! คำสั่งฉุกเฉิน! 🚨";
+        
+        let count = 3;
+        document.getElementById('eventDesc').innerHTML = `<div class="countdown-num">${count}</div>`;
+        
+        // ส่งสัญญาณบอกจอมือถือให้นับถอยหลัง 3 วินาที
+        roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'COUNTDOWN_START', seconds: count } });
 
-          document.getElementById('eventTitle').innerText = "🤐 SILENT MODE (1 นาที)";
-          document.getElementById('eventDesc').innerText = `กฎเหล็กจาก AI: ห้ามใครพูดคำว่า "${randomWord}" เด็ดขาด!`;
-          roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SILENT_RULE', word: randomWord } });
-        } 
-        else if (eventType === 5) {
-          let aiPrompt = "ขอคำถามโหวตปั่นๆ กวนๆ ฮาๆ ในวงเหล้าเพื่อนสนิท 1 ข้อ เช่น 'ใครทรงน่าจะกลับบ้านคนแรก', 'ใครชอบทักหาแฟนเก่าตอนเมา' ตอบเฉพาะคำถามภาษาไทยสั้นๆ ไม่ต้องมีอารัมภบท";
-          let q = await askGemini(aiPrompt, "ใครทรงน่าจะกลับบ้านคนแรก?");
+        let countdownTimer = setInterval(async () => {
+          count--;
+          if (count > 0) {
+            document.getElementById('eventDesc').innerHTML = `<div class="countdown-num">${count}</div>`;
+          } else {
+            clearInterval(countdownTimer);
+            statusBox.classList.remove('warning-mode');
+            executeEvent(); // หมดเวลา 3 วิ -> เริ่มเฉลยมินิเกม
+          }
+        }, 1000);
+      }
+    }
 
-          document.getElementById('eventTitle').innerText = "👉 VOTE TIME!";
-          document.getElementById('eventDesc').innerText = "🤖 คำถามจาก AI: " + q;
-          roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'VOTE_GAME', question: q, playerList: playerList.map(p => p.player_name) } });
-        }
+    async function executeEvent() {
+      let eventType = Math.floor(Math.random() * 5) + 1; 
+
+      if (eventType === 1) {
+        let victim = playerList[Math.floor(Math.random() * playerList.length)];
+        document.getElementById('eventTitle').innerText = "🚨 RED FLASH! 🚨";
+        document.getElementById('eventDesc').innerText = `สเปกตรัมตกที่: ${victim.player_name} (ยก 1 ช็อต!)`;
+        roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'RED_FLASH', victimName: victim.player_name } });
+      } 
+      else if (eventType === 2) {
+        document.getElementById('eventTitle').innerText = "⚡ SPEED TAP! ⚡";
+        document.getElementById('eventDesc').innerText = "กดปุ่มบนมือถือด่วน! ใครกดช้าสุดเตรียมตัว!";
+        roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SPEED_TAP' } });
+      } 
+      else if (eventType === 3) {
+        let holder = playerList[Math.floor(Math.random() * playerList.length)];
+        document.getElementById('eventTitle').innerText = "💣 BOMB PASS! 💣";
+        document.getElementById('eventDesc').innerText = `ระเบิดเริ่มที่: ${holder.player_name}! รีบส่งต่อด่วน!`;
+        roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'BOMB_START', holderName: holder.player_name, playerList: playerList.map(p => p.player_name) } });
+      } 
+      else if (eventType === 4) {
+        let aiPrompt = "ขอคำห้ามพูด 1 คำที่คนในวงเหล้าชอบพูดบ่อยๆ ขอแบบคำเดียวสั้นๆ ภาษาไทย เช่น 'กิน', 'แก้ว', 'มึง', 'ชน' ตอบเฉพาะตัวคำนั้นเท่านั้น";
+        let randomWord = await askGemini(aiPrompt, "ชน");
+
+        document.getElementById('eventTitle').innerText = "🤐 SILENT MODE (1 นาที)";
+        document.getElementById('eventDesc').innerText = `กฎเหล็กจาก AI: ห้ามใครพูดคำว่า "${randomWord}" เด็ดขาด!`;
+        roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SILENT_RULE', word: randomWord } });
+      } 
+      else if (eventType === 5) {
+        let aiPrompt = "ขอคำถามโหวตปั่นๆ กวนๆ ฮาๆ ในวงเหล้าเพื่อนสนิท 1 ข้อ เช่น 'ใครทรงน่าจะกลับบ้านคนแรก', 'ใครชอบทักหาแฟนเก่าตอนเมา' ตอบเฉพาะคำถามภาษาไทยสั้นๆ ไม่ต้องมีอารัมภบท";
+        let q = await askGemini(aiPrompt, "ใครทรงน่าจะกลับบ้านคนแรก?");
+
+        document.getElementById('eventTitle').innerText = "👉 VOTE TIME!";
+        document.getElementById('eventDesc').innerText = "🤖 คำถามจาก AI: " + q;
+        roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'VOTE_GAME', question: q, playerList: playerList.map(p => p.player_name) } });
       }
     }
 

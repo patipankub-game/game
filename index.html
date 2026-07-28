@@ -3,206 +3,143 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Party Cyber Controller</title>
+  <title>Party Chaos Engine - Player</title>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    * { box-sizing: border-box; font-family: 'Kanit', sans-serif; user-select: none; }
+    * { box-sizing: border-box; font-family: 'Kanit', sans-serif; }
     body {
-      margin: 0; padding: 0; height: 100vh; background: #0a0a12; color: white;
-      display: flex; justify-content: center; align-items: center; transition: background 0.3s;
+      margin: 0; padding: 20px; min-height: 100vh; background: #080811;
+      color: white; text-align: center; display: flex; flex-direction: column; justify-content: center;
     }
-    .glass-card {
-      background: rgba(22, 22, 35, 0.85); backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 24px;
-      padding: 24px; width: 90%; max-width: 380px; text-align: center;
+    .card {
+      background: rgba(22, 22, 35, 0.9); border: 1px solid rgba(255, 0, 128, 0.3);
+      border-radius: 20px; padding: 25px; box-shadow: 0 0 20px rgba(0,0,0,0.5);
     }
-    h1.logo {
-      font-size: 28px; font-weight: 800; margin: 0;
-      background: linear-gradient(45deg, #ff007f, #4facfe);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    input {
+      width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px;
+      border: 1px solid #ff007f; background: #161623; color: white;
+      font-size: 18px; text-align: center; outline: none;
     }
-    input, select {
-      width: 100%; padding: 14px; border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(10, 10, 20, 0.6);
-      color: #fff; font-size: 16px; text-align: center; margin-bottom: 12px;
+    button {
+      width: 100%; padding: 14px; margin-top: 10px; border-radius: 10px; border: none;
+      background: linear-gradient(45deg, #ff007f, #00f2fe); color: white;
+      font-size: 18px; font-weight: bold; cursor: pointer;
     }
-    .btn-neon {
-      width: 100%; padding: 16px; border: none; border-radius: 14px;
-      background: linear-gradient(45deg, #ff007f, #7928ca); color: white;
-      font-size: 18px; font-weight: 600; cursor: pointer; margin-top: 10px;
-    }
-    .hidden { display: none !important; }
-    .punish-bg { background: #ff0055 !important; }
-    .safe-bg { background: #10ac84 !important; }
+    .game-screen { display: none; }
+    .status-text { font-size: 24px; font-weight: bold; color: #00f2fe; margin-bottom: 15px; }
+    .btn-leave { background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff4d4d; font-size: 14px; padding: 8px; margin-top: 20px; }
   </style>
 </head>
 <body>
 
-  <!-- หน้าเข้าห้อง -->
-  <div id="screen-join" class="glass-card">
-    <h1 class="logo">PARTY OS 🥂</h1>
-    <p style="color: #aaa; font-size: 13px;">กรอกข้อมูลเพื่อร่วมวง</p>
-    <input type="text" id="roomCode" placeholder="รหัสห้อง เช่น 8888" maxlength="4">
-    <input type="text" id="playerName" placeholder="ชื่อของคุณ">
-    <button id="btnJoin" class="btn-neon" onclick="joinRoom()">เข้าวงด่วน! 🚀</button>
-  </div>
-
-  <!-- หน้ารอรับ Chaos Event -->
-  <div id="screen-lobby" class="glass-card hidden">
-    <h2 id="displayPlayerName" style="color: #ff007f; margin: 0;">-</h2>
-    <div id="statusBox" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; margin-top: 15px;">
-      🍺 สังสรรค์ไปตามปกติ... ลุ้นระบบสุ่มเตือน!
+  <div class="card">
+    <!-- หน้าจอ LOGIN -->
+    <div id="loginScreen">
+      <h2 style="color:#ff007f; margin-top:0;">เข้าร่วมวงปาร์ตี้ 🍻</h2>
+      <input type="number" id="roomInput" placeholder="กรอก Room Code (4 หลัก)">
+      <input type="text" id="nameInput" placeholder="พิมพ์ชื่อของคุณ">
+      <button onclick="joinGame()">เข้าวงด่วน!</button>
     </div>
 
-    <!-- ปุ่มสำหรับ Speed Tap -->
-    <button id="btnTap" class="btn-neon hidden" style="background: red;" onclick="handleTap()">กดด่วนที่สุด! ⚡</button>
-
-    <!-- ปุ่มสำหรับ Bomb Pass -->
-    <div id="bombBox" class="hidden">
-      <h1 style="font-size: 50px; margin: 0;">💣</h1>
-      <p id="bombTimer" style="color: yellow; font-size: 24px; font-weight: bold;"></p>
-      <select id="targetPlayerSelect"></select>
-      <button class="btn-neon" onclick="passBomb()">โยนระเบิดให้เพื่อน! 💥</button>
-    </div>
-
-    <!-- กล่องโหวต Vote Game -->
-    <div id="voteBox" class="hidden">
-      <p id="voteQuestion" style="color: #00f2fe; font-weight: bold;"></p>
-      <select id="voteSelect"></select>
-      <button class="btn-neon" onclick="submitVote()">ส่งผลโหวต 🗳️</button>
+    <!-- หน้าจอผู้เล่นขณะอยู่ในเกม -->
+    <div id="gameScreen" class="game-screen">
+      <div id="playerNameDisplay" style="color: #aaa; font-size: 14px;">ผู้เล่น: -</div>
+      <div id="roomDisplay" style="color: #00f2fe; font-size: 16px; margin-bottom: 20px;">ห้อง: -</div>
+      <div id="statusText" class="status-text">👀 รอคำสั่งจากจอกลาง...</div>
+      <div id="actionArea"></div>
+      
+      <button class="btn-leave" onclick="leaveGame()">🚪 ออกจากห้องนี้</button>
     </div>
   </div>
 
   <script>
     const SUPABASE_URL = 'https://afhsvrsgfuxaeqvjedxf.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjEwMDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjE0MDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let myName = "";
-    let roomCode = "";
-    let roomChannel;
-    let bombInterval;
+    let currentRoom = "";
+    let currentPlayer = "";
+    let roomChannel = null;
 
-    async function joinRoom() {
-      roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
-      myName = document.getElementById('playerName').value.trim();
-      if (!roomCode || !myName) return alert('กรอกข้อมูลให้ครบก่อนนะครับ');
-
-      await _supabase.from('players').insert([{ room_code: roomCode, player_name: myName }]);
-
-      document.getElementById('displayPlayerName').innerText = myName;
-      document.getElementById('screen-join').classList.add('hidden');
-      document.getElementById('screen-lobby').classList.remove('hidden');
-
-      roomChannel = _supabase.channel('room_' + roomCode);
+    // 🔄 เช็กตอนเปิดหน้าเว็บว่าเคยเซฟชื่อไว้ไหม (ถ้ามี ให้เข้าเกมอัตโนมัติ)
+    window.onload = () => {
+      const savedRoom = localStorage.getItem('party_room');
+      const savedName = localStorage.getItem('party_name');
       
-      roomChannel.on('broadcast', { event: 'chaos_trigger' }, payload => {
-        let d = payload.payload;
-        resetUI();
+      if (savedRoom && savedName) {
+        document.getElementById('roomInput').value = savedRoom;
+        document.getElementById('nameInput').value = savedName;
+        joinGame(true); // สั่งเข้าเกมอัตโนมัติ
+      }
+    };
 
-        if (d.type === 'SAFE_ZONE') {
-          document.body.classList.add('safe-bg');
-          document.getElementById('statusBox').innerHTML = `<h2 style='margin:0;'>🟢 รอดตัว!</h2><p>${d.msg}</p>`;
-        }
-        else if (d.type === 'RED_FLASH') {
-          if (d.victimName === myName) {
-            document.body.classList.add('punish-bg');
-            document.getElementById('statusBox').innerHTML = "<h1 style='margin:0;'>🚨 โดนเต็มๆ! 🚨</h1><h3>จัดไป 1 ช็อตเพียวๆ!</h3>";
-          } else {
-            document.getElementById('statusBox').innerHTML = `😮 ตกที่ <b>${d.victimName}</b><br><span style='color:#2ed573;'>คุณรอดตัวไป!</span>`;
-          }
-        } 
-        else if (d.type === 'SPEED_TAP') {
-          document.getElementById('statusBox').innerHTML = "<h2 style='color:yellow;'>⚡ แข่งความไว! ⚡</h2>";
-          document.getElementById('btnTap').classList.remove('hidden');
-        } 
-        else if (d.type === 'BOMB_START') {
-          if (d.holderName === myName) {
-            startBombCountdown(d.playerList);
-          } else {
-            document.getElementById('statusBox').innerHTML = `💣 ระเบิดเวลาอยู่ที่ <b>${d.holderName}</b>!`;
-          }
-        }
-        else if (d.type === 'BOMB_TRANSFER') {
-          if (d.to === myName) {
-            startBombCountdown(d.playerList);
-          } else {
-            document.getElementById('statusBox').innerHTML = `💣 ระเบิดถูกโยนไปที่ <b>${d.to}</b>!`;
-          }
-        }
-        else if (d.type === 'SILENT_RULE') {
-          document.getElementById('statusBox').innerHTML = `<h2 style='color:#ff0055;'>🤐 SILENT MODE</h2><p>ห้ามพูดคำว่า: <b style='font-size:24px; color:yellow;'>${d.word}</b> (1 นาที)</p>`;
-        }
-        else if (d.type === 'VOTE_GAME') {
-          document.getElementById('statusBox').classList.add('hidden');
-          document.getElementById('voteBox').classList.remove('hidden');
-          document.getElementById('voteQuestion').innerText = d.question;
-          let sel = document.getElementById('voteSelect');
-          sel.innerHTML = '';
-          d.playerList.filter(p => p !== myName).forEach(p => {
-            sel.innerHTML += `<option value="${p}">${p}</option>`;
-          });
-        }
-      }).subscribe();
+    async function joinGame(isAuto = false) {
+      const room = document.getElementById('roomInput').value.trim();
+      const name = document.getElementById('nameInput').value.trim();
+
+      if (!room || !name) {
+        alert("กรุณากรอก Room Code และชื่อให้ครบถ้วนครับ!");
+        return;
+      }
+
+      currentRoom = room;
+      currentPlayer = name;
+
+      // เซฟข้อมูลลงเครื่องโทรศัพท์
+      localStorage.setItem('party_room', room);
+      localStorage.setItem('party_name', name);
+
+      if (!isAuto) {
+        // ส่งชื่อเข้า Supabase เฉพาะตอนที่ไม่ได้กด Refresh อัตโนมัติ
+        await _supabase.from('players').insert([{ room_code: room, player_name: name }]);
+      }
+
+      // สลับหน้าจอ
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('playerNameDisplay').innerText = `ผู้เล่น: ${name}`;
+      document.getElementById('roomDisplay').innerText = `ห้อง: ${room}`;
+
+      listenToRoom();
     }
 
-    function resetUI() {
-      document.body.classList.remove('punish-bg');
-      document.body.classList.remove('safe-bg');
-      document.getElementById('statusBox').classList.remove('hidden');
-      document.getElementById('btnTap').classList.add('hidden');
-      document.getElementById('bombBox').classList.add('hidden');
-      document.getElementById('voteBox').classList.add('hidden');
-      clearInterval(bombInterval);
-    }
+    function listenToRoom() {
+      if (roomChannel) _supabase.removeChannel(roomChannel);
 
-    function handleTap() {
-      document.getElementById('btnTap').classList.add('hidden');
-      document.getElementById('statusBox').innerHTML = "<h2 style='color:#2ed573;'>✅ กดสำเร็จ!</h2><p>รอดตายเรียบร้อย!</p>";
-    }
-
-    function startBombCountdown(playerList) {
-      document.getElementById('statusBox').classList.add('hidden');
-      document.getElementById('bombBox').classList.remove('hidden');
+      roomChannel = _supabase.channel('room_' + currentRoom);
       
-      let sel = document.getElementById('targetPlayerSelect');
-      sel.innerHTML = '';
-      playerList.filter(p => p !== myName).forEach(p => {
-        sel.innerHTML += `<option value="${p}">${p}</option>`;
-      });
+      roomChannel
+        .on('broadcast', { event: 'chaos_trigger' }, payload => {
+          let data = payload.payload;
+          let status = document.getElementById('statusText');
+          let area = document.getElementById('actionArea');
 
-      let timeLeft = 10;
-      document.getElementById('bombTimer').innerText = timeLeft + " วินาที!";
-
-      bombInterval = setInterval(() => {
-        timeLeft--;
-        document.getElementById('bombTimer').innerText = timeLeft + " วินาที!";
-        if (timeLeft <= 0) {
-          clearInterval(bombInterval);
-          document.body.classList.add('punish-bg');
-          document.getElementById('bombBox').classList.add('hidden');
-          document.getElementById('statusBox').classList.remove('hidden');
-          document.getElementById('statusBox').innerHTML = "<h1>💥 ตู้มมมม! 💥</h1><h3>ส่งไม่ทัน! จัดไป 1 ช็อต!</h3>";
-          roomChannel.send({ type: 'broadcast', event: 'game_response', payload: { action: 'BOMB_EXPLODED', victim: myName } });
-        }
-      }, 1000);
+          if (data.type === 'SAFE_ZONE') {
+            status.innerText = "🟢 SAFE ZONE!";
+            area.innerHTML = `<p style="color:#fff">${data.msg}</p>`;
+          } 
+          else if (data.type === 'RED_FLASH') {
+            status.innerText = "🚨 RED FLASH! 🚨";
+            if (data.victimName === currentPlayer) {
+              area.innerHTML = `<h1 style="color:#ff0055; font-size:40px;">โดนเต็มๆ!<br>จัดไป 1 ช็อต! 🍺</h1>`;
+            } else {
+              area.innerHTML = `<p>รอดตัวไป! คนโดนคือ: <b style="color:#00f2fe">${data.victimName}</b></p>`;
+            }
+          }
+          else if (data.type === 'SILENT_RULE') {
+            status.innerText = "🤐 SILENT MODE";
+            area.innerHTML = `<p>ห้ามพูดคำว่า: <b style="color:#ff007f; font-size:24px;">"${data.word}"</b></p>`;
+          }
+        })
+        .subscribe();
     }
 
-    function passBomb() {
-      let target = document.getElementById('targetPlayerSelect').value;
-      clearInterval(bombInterval);
-      document.getElementById('bombBox').classList.add('hidden');
-      document.getElementById('statusBox').classList.remove('hidden');
-      document.getElementById('statusBox').innerHTML = `🚀 โยนระเบิดไปให้ <b>${target}</b> แล้ว!`;
-
-      roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'BOMB_TRANSFER', to: target } });
-    }
-
-    function submitVote() {
-      document.getElementById('voteBox').classList.add('hidden');
-      document.getElementById('statusBox').classList.remove('hidden');
-      document.getElementById('statusBox').innerHTML = "✅ ส่งผลโหวตเรียบร้อย!";
+    // 🚪 ปุ่มกดออกจากห้อง (สำหรับล้างความจำเครื่องโทรศัพท์)
+    function leaveGame() {
+      localStorage.removeItem('party_room');
+      localStorage.removeItem('party_name');
+      window.location.reload();
     }
   </script>
 </body>

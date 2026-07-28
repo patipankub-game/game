@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Party Chaos Engine (AI Powered)</title>
+  <title>Party Chaos Engine (Auto Room System)</title>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
@@ -24,7 +24,7 @@
       border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 20px;
       padding: 10px 25px; display: inline-block; margin: 15px 0;
     }
-    .room-code { font-size: 36px; font-weight: 800; color: #00f2fe; }
+    .room-code { font-size: 36px; font-weight: 800; color: #00f2fe; letter-spacing: 2px; }
     
     .status-box {
       background: rgba(20, 20, 35, 0.9); border: 2px solid #ff007f;
@@ -47,40 +47,41 @@
       background: linear-gradient(45deg, #7928ca, #ff007f);
       font-size: 14px; padding: 4px 12px; border-radius: 10px; margin-left: 8px; vertical-align: middle;
     }
-    .btn-reset {
+    .btn-action {
       background: rgba(255, 0, 85, 0.2); border: 1px solid #ff0055;
-      color: #ff4d4d; padding: 8px 16px; border-radius: 12px;
-      font-size: 14px; cursor: pointer; margin-top: 15px; transition: 0.2s;
+      color: #ff4d4d; padding: 10px 20px; border-radius: 14px;
+      font-size: 16px; cursor: pointer; margin-top: 25px; transition: 0.2s; font-weight: 600;
     }
-    .btn-reset:hover { background: #ff0055; color: white; }
+    .btn-action:hover { background: #ff0055; color: white; box-shadow: 0 0 15px rgba(255,0,85,0.5); }
   </style>
 </head>
 <body>
 
   <div class="container">
     <h1 class="logo">PARTY CHAOS ENGINE <span class="ai-badge">AI ACTIVE 🤖</span></h1>
-    <div class="room-card">ROOM CODE: <span class="room-code">8888</span></div>
+    <div class="room-card">ROOM CODE: <span id="displayRoomCode" class="room-code">----</span></div>
 
     <div class="status-box">
-      <div id="eventTitle" class="event-title">👀 </div>
-      <div id="eventDesc" class="event-desc">แกโดนแน่ นังทัวร์ดี</div>
+      <div id="eventTitle" class="event-title">👀 กำลังส่องวงเหล้า...</div>
+      <div id="eventDesc" class="event-desc">ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)</div>
     </div>
 
     <h3 style="margin-top: 30px;">👥 ผู้ร่วมชะตากรรม (<span id="playerCount" style="color: #ff007f;">0</span> คน)</h3>
     <div id="playersGrid" class="players-grid"></div>
 
-    <!-- ปุ่มกดล้างห้อง/เริ่มวงใหม่ -->
-    <button class="btn-reset" onclick="resetRoom()">🗑️ ล้างรายชื่อผู้เล่น (เริ่มวงใหม่)</button>
+    <button class="btn-action" onclick="finishAndNewRoom()">🚪 จบวงนี้ & สุ่มสร้างห้องใหม่ (ลบผู้เล่นเก่า)</button>
   </div>
 
   <script>
     const SUPABASE_URL = 'https://afhsvrsgfuxaeqvjedxf.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjEwMDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjE0MDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const targetRoom = "8888";
 
-    // 🔑 เอา API Key ของ Gemini มาวางตรงนี้ครับ
     const GEMINI_API_KEY = "วาง_GEMINI_API_KEY_ของคุณตรงนี้";
+
+    // 🎲 ฟังก์ชั่นสุ่ม Room Code 4 หลัก
+    let targetRoom = Math.floor(1000 + Math.random() * 9000).toString();
+    document.getElementById('displayRoomCode').innerText = targetRoom;
 
     let playerList = [];
     let roomChannel = _supabase.channel('room_' + targetRoom);
@@ -112,13 +113,11 @@
       });
     }
 
-    // 🧹 ฟังก์ชั่นสำหรับล้างผู้เล่นทั้งหมดในห้องนี้ออก
-    async function resetRoom() {
-      if (confirm("คุณต้องการล้างรายชื่อผู้เล่นเก่าทั้งหมดเพื่อเริ่มวงใหม่ใช่ไหม?")) {
+    // 🧹 ฟังก์ชั่นจบวง ลบข้อมูลในห้องนี้ แล้วรีโหลดสร้างห้องใหม่
+    async function finishAndNewRoom() {
+      if (confirm("ต้องการปิดวงนี้ และลบรายชื่อผู้เล่นเพื่อสุ่มสร้างห้องใหม่ใช่ไหม?")) {
         await _supabase.from('players').delete().eq('room_code', targetRoom);
-        playerList = [];
-        renderPlayers();
-        alert("ล้างรายชื่อเรียบร้อย! เพื่อนๆ สามารถสแกนกดเข้าห้องใหม่ได้เลย");
+        window.location.reload(); 
       }
     }
 

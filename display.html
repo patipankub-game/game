@@ -44,6 +44,19 @@
 
     .event-title { font-size: 38px; font-weight: 800; color: #00f2fe; }
     .event-desc { font-size: 22px; color: #fff; margin-top: 10px; }
+
+    /* 💓 Heartbeat: จุดกระพริบตลอดเวลาตอนอยู่โหมดรอ เพื่อยืนยันว่าระบบยังทำงานอยู่ ไม่ได้ค้าง */
+    .heartbeat-dot {
+      display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+      background: #00ff88; margin-right: 8px; vertical-align: middle;
+      animation: pulseDot 1.2s ease-in-out infinite;
+      box-shadow: 0 0 8px #00ff88;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.7); }
+    }
+    .live-label { font-size: 14px; color: #00ff88; letter-spacing: 1px; margin-bottom: 8px; }
     .countdown-num { font-size: 90px; font-weight: 800; color: #ff0055; text-shadow: 0 0 20px #ff0055; margin: 0; }
 
     .players-grid {
@@ -81,6 +94,7 @@
     <div class="room-card">ROOM CODE: <span id="displayRoomCode" class="room-code">----</span></div>
 
     <div id="statusBox" class="status-box">
+      <div id="liveIndicator" class="live-label"><span class="heartbeat-dot"></span>LIVE - ระบบทำงานปกติ</div>
       <div id="eventTitle" class="event-title">👀 กำลังส่องวงเหล้า...</div>
       <div id="eventDesc" class="event-desc">ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)</div>
     </div>
@@ -113,6 +127,20 @@
     let playerList = [];
     let roomChannel = _supabase.channel('room_' + targetRoom);
     let audioAllowed = false;
+    let idleResetTimer = null; // ตัวจับเวลาเด้งกลับหน้ารอ หลังโชว์คำสั่ง/ผลลัพธ์ครบเวลา
+
+    // 🔁 เด้งกลับไปหน้า "กำลังส่อง..." (โหมดรอ) และโชว์ heartbeat ให้เห็นว่าระบบยังทำงานอยู่
+    function resetToIdle() {
+      document.getElementById('statusBox').classList.remove('warning-mode');
+      document.getElementById('eventTitle').innerText = "👀 กำลังส่องวงเหล้า...";
+      document.getElementById('eventDesc').innerText = "ระบบสุ่มทุก 1.5 - 3 นาที (AI สุ่มคิดเกมสดตลอดเวลา)";
+      document.getElementById('liveIndicator').style.display = 'block';
+    }
+
+    function scheduleIdleReset(ms = 10000) {
+      if (idleResetTimer) clearTimeout(idleResetTimer);
+      idleResetTimer = setTimeout(resetToIdle, ms);
+    }
 
     function enableAudio() {
       let audio = document.getElementById('sirenSound');
@@ -219,15 +247,19 @@
         let randomMsg = safeMessages[Math.floor(Math.random() * safeMessages.length)];
 
         document.getElementById('statusBox').classList.remove('warning-mode');
+        document.getElementById('liveIndicator').style.display = 'none';
         document.getElementById('eventTitle').innerText = "🟢 SAFE ZONE!";
         document.getElementById('eventDesc').innerText = randomMsg;
 
         roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'SAFE_ZONE', msg: randomMsg } });
+        scheduleIdleReset(); // โชว์ข้อความ 10 วิ แล้วเด้งกลับหน้ารอ
       } 
       else {
+        if (idleResetTimer) clearTimeout(idleResetTimer); // ระหว่างนับถอยหลัง/โชว์ผล ยังไม่ต้องเด้งกลับ
         playSiren();
         let statusBox = document.getElementById('statusBox');
         statusBox.classList.add('warning-mode');
+        document.getElementById('liveIndicator').style.display = 'none';
 
         document.getElementById('eventTitle').innerText = "🚨 WARNING! คำสั่งฉุกเฉิน! 🚨";
         
@@ -285,6 +317,8 @@
         document.getElementById('eventDesc').innerText = "🤖 คำถามจาก AI: " + q;
         roomChannel.send({ type: 'broadcast', event: 'chaos_trigger', payload: { type: 'VOTE_GAME', question: q, playerList: playerList.map(p => p.player_name) } });
       }
+
+      scheduleIdleReset(); // โชว์คำสั่ง/ผลลัพธ์ 10 วิ แล้วเด้งกลับหน้า "กำลังส่อง..." อัตโนมัติ
     }
 
     startChaosLoop();

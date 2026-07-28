@@ -72,9 +72,22 @@
       auth: { persistSession: false }
     });
 
-    let currentRoom = "";
-    let currentPlayer = "";
+    // 🔒 จำ session ผู้เล่นไว้ใน localStorage กัน refresh แล้วเด้งออกไปหน้ากรอกใหม่
+    let currentRoom = localStorage.getItem('party_player_room') || "";
+    let currentPlayer = localStorage.getItem('party_player_name') || "";
     let roomChannel = null;
+    let resetTimer = null; // ตัวจับเวลาเด้งกลับหน้ารอคำสั่ง
+
+    // ถ้ามี session ค้างอยู่ (จาก refresh) ให้เข้าห้องต่อเลยโดยไม่ต้องกรอกใหม่
+    window.addEventListener('DOMContentLoaded', () => {
+      if (currentRoom && currentPlayer) {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('gameScreen').style.display = 'block';
+        document.getElementById('playerNameDisplay').innerText = `ผู้เล่น: ${currentPlayer}`;
+        document.getElementById('roomDisplay').innerText = `ห้อง: ${currentRoom}`;
+        listenToRoom();
+      }
+    });
 
     async function joinGame() {
       const room = document.getElementById('roomInput').value.trim();
@@ -99,12 +112,28 @@
         return;
       }
 
+      // 🔒 บันทึก session ไว้กัน refresh หลุด
+      localStorage.setItem('party_player_room', room);
+      localStorage.setItem('party_player_name', name);
+
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('playerNameDisplay').innerText = `ผู้เล่น: ${name}`;
       document.getElementById('roomDisplay').innerText = `ห้อง: ${room}`;
 
       listenToRoom();
+    }
+
+    // 🔁 ฟังก์ชันเด้งกลับหน้า "รอคำสั่ง" หลังจากโชว์คำสั่ง/ผลลัพธ์ครบเวลาแล้ว
+    function resetStatus() {
+      document.body.classList.remove('warning-flash');
+      document.getElementById('statusText').innerText = "👀 รอคำสั่งจากจอกลาง...";
+      document.getElementById('actionArea').innerHTML = '';
+    }
+
+    function scheduleReset(ms = 10000) {
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(resetStatus, ms);
     }
 
     function listenToRoom() {
@@ -119,6 +148,7 @@
           let area = document.getElementById('actionArea');
 
           if (data.type === 'COUNTDOWN_START') {
+            if (resetTimer) clearTimeout(resetTimer); // ยกเลิกตัวจับเวลาเก่า ระหว่างนับถอยหลังยังไม่ต้องเด้งกลับ
             document.body.classList.add('warning-flash');
             if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
             
@@ -140,6 +170,7 @@
             document.body.classList.remove('warning-flash');
             status.innerText = "🟢 SAFE ZONE!";
             area.innerHTML = `<p style="color:#fff">${data.msg}</p>`;
+            scheduleReset();
           } 
           else if (data.type === 'RED_FLASH') {
             document.body.classList.remove('warning-flash');
@@ -150,17 +181,44 @@
             } else {
               area.innerHTML = `<p>รอดตัวไป! คนโดนคือ: <b style="color:#00f2fe">${data.victimName}</b></p>`;
             }
+            scheduleReset();
           }
           else if (data.type === 'SILENT_RULE') {
             document.body.classList.remove('warning-flash');
             status.innerText = "🤐 SILENT MODE";
             area.innerHTML = `<p>ห้ามพูดคำว่า: <b style="color:#ff007f; font-size:24px;">"${data.word}"</b></p>`;
+            scheduleReset();
+          }
+          else if (data.type === 'SPEED_TAP') {
+            document.body.classList.remove('warning-flash');
+            status.innerText = "⚡ SPEED TAP! ⚡";
+            area.innerHTML = `<p>กดปุ่มด้านล่างให้เร็วที่สุด!</p><button onclick="this.innerText='กดแล้ว!✅'; this.disabled=true;">🔥 กดตรงนี้!</button>`;
+            scheduleReset();
+          }
+          else if (data.type === 'BOMB_START') {
+            document.body.classList.remove('warning-flash');
+            status.innerText = "💣 BOMB PASS! 💣";
+            if (data.holderName === currentPlayer) {
+              if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+              area.innerHTML = `<h1 style="color:#ff0055; font-size:30px;">ระเบิดอยู่ที่คุณ!<br>รีบส่งต่อด่วน! 💣</h1>`;
+            } else {
+              area.innerHTML = `<p>ระเบิดเริ่มที่: <b style="color:#00f2fe">${data.holderName}</b></p>`;
+            }
+            scheduleReset();
+          }
+          else if (data.type === 'VOTE_GAME') {
+            document.body.classList.remove('warning-flash');
+            status.innerText = "👉 VOTE TIME!";
+            area.innerHTML = `<p style="color:#fff">${data.question}</p>`;
+            scheduleReset();
           }
         })
         .subscribe();
     }
 
     function leaveGame() {
+      localStorage.removeItem('party_player_room');
+      localStorage.removeItem('party_player_name');
       window.location.reload();
     }
   </script>

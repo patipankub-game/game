@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Party Chaos Engine - Player</title>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; font-family: 'Kanit', sans-serif; }
     body {
@@ -65,8 +65,12 @@
 
   <script>
     const SUPABASE_URL = 'https://afhsvrsgfuxaeqvjedxf.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjE0MDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaHN2cnNnZnV4YWVxdmplZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTc0NDIsImV4cCI6MjEwMDc5MzQ0Mn0.yIrUTR3EXBgyzqqlxSvsY39mxP3hjzi51HJkExE2okM';
+    
+    // สร้าง Supabase Client แบบระบุ auth persistSession
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false }
+    });
 
     let currentRoom = "";
     let currentPlayer = "";
@@ -84,7 +88,7 @@
       currentRoom = room;
       currentPlayer = name;
 
-      // บันทึกลง Supabase ทันที
+      // บันทึกลง Supabase
       const { data, error } = await _supabase
         .from('players')
         .insert([{ room_code: room, player_name: name }]);
